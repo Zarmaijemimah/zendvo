@@ -1,9 +1,9 @@
 import { NextRequest } from "next/server";
 import { verifyAccessToken, type TokenPayload } from "@/lib/tokens";
 
-export function getAuthPayload(
+export async function getAuthPayload(
   request: Request | NextRequest,
-): TokenPayload | null {
+): Promise<TokenPayload | null> {
   const header =
     request.headers.get("authorization") ||
     request.headers.get("Authorization");
@@ -16,5 +16,5 @@ export function getAuthPayload(
     return null;
   }
 
-  return verifyAccessToken(token);
+  return await verifyAccessToken(token);
 }

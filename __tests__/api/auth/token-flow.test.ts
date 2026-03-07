@@ -18,8 +18,8 @@ jest.mock("@/lib/prisma", () => ({
 
 jest.mock("@/lib/tokens", () => ({
   verifyRefreshToken: jest.fn(),
-  generateAccessToken: jest.fn(() => "new-access-token"),
-  generateRefreshToken: jest.fn(() => "new-refresh-token"),
+  generateAccessToken: jest.fn(() => Promise.resolve("new-access-token")),
+  generateRefreshToken: jest.fn(() => Promise.resolve("new-refresh-token")),
 }));
 
 describe("Token Flow Tests", () => {

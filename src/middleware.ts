@@ -22,6 +22,11 @@ const PROTECTED_API_ROUTES = [
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
+  // Always redirect root to login page
+  if (pathname === "/") {
+    return NextResponse.redirect(new URL("/auth/login", request.url));
+  }
+
   // Explicit bypass: /api/auth/refresh must never be protected.
   // Middleware calls this endpoint internally for token refresh —
   // protecting it would create an infinite loop.
@@ -36,7 +41,7 @@ export async function middleware(request: NextRequest) {
 
   // Dashboard page route protection (cookie-based)
   if (pathname.startsWith("/dashboard")) {
-    return handleDashboardRoute(request);
+    return await handleDashboardRoute(request);
   }
 
   // API route protection (header-based with cookie fallback)
@@ -45,7 +50,7 @@ export async function middleware(request: NextRequest) {
   );
 
   if (isProtectedApi) {
-    return handleApiRoute(request);
+    return await handleApiRoute(request);
   }
 
   return NextResponse.next();
@@ -70,7 +75,7 @@ async function handleDashboardRoute(
 
   // Case 1: Access token present — check validity
   if (accessToken) {
-    const result = verifyAccessTokenDetailed(accessToken);
+    const result = await verifyAccessTokenDetailed(accessToken);
 
     if (result.valid) {
       return injectUserHeaders(request, result.payload);
@@ -109,7 +114,7 @@ async function attemptTokenRefresh(
       const newRefreshToken: string = data.data.refreshToken;
 
       // Verify the fresh access token to extract user payload
-      const payload = verifyAccessToken(newAccessToken);
+      const payload = await verifyAccessToken(newAccessToken);
       if (payload) {
         const response = injectUserHeaders(request, payload);
 
@@ -140,12 +145,12 @@ function redirectToLogin(request: NextRequest): NextResponse {
   return NextResponse.redirect(loginUrl);
 }
 
-function handleApiRoute(request: NextRequest): NextResponse {
+async function handleApiRoute(request: NextRequest): Promise<NextResponse> {
   // Primary: Authorization header (backward-compatible with existing API clients)
   const authHeader = request.headers.get("Authorization");
   if (authHeader && authHeader.startsWith("Bearer ")) {
     const token = authHeader.split(" ")[1];
-    const payload = verifyAccessToken(token);
+    const payload = await verifyAccessToken(token);
     if (payload) {
       return injectUserHeaders(request, payload);
     }
@@ -154,7 +159,7 @@ function handleApiRoute(request: NextRequest): NextResponse {
   // Fallback: Cookie-based auth (for browser-originated API calls)
   const accessToken = request.cookies.get(ACCESS_TOKEN_COOKIE)?.value;
   if (accessToken) {
-    const payload = verifyAccessToken(accessToken);
+    const payload = await verifyAccessToken(accessToken);
     if (payload) {
       return injectUserHeaders(request, payload);
     }
@@ -170,5 +175,5 @@ function handleApiRoute(request: NextRequest): NextResponse {
 }
 
 export const config = {
-  matcher: ["/api/:path*", "/dashboard/:path*", "/dashboard"],
+  matcher: ["/", "/api/:path*", "/dashboard/:path*", "/dashboard"],
 };

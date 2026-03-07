@@ -4,7 +4,7 @@ import { getAuthPayload } from "@/lib/auth-session";
 
 export async function GET(request: NextRequest) {
   try {
-    const payload = getAuthPayload(request);
+    const payload = await getAuthPayload(request);
     if (!payload) {
       return NextResponse.json(
         { success: false, error: "Unauthorized" },

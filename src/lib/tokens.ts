@@ -1,5 +1,4 @@
-import jwt from "jsonwebtoken";
-import crypto from "crypto";
+import * as jose from "jose";
 
 const ACCESS_TOKEN_SECRET = process.env.JWT_SECRET || "fallback_access_secret";
 const REFRESH_TOKEN_SECRET =
@@ -8,51 +7,70 @@ const REFRESH_TOKEN_SECRET =
 const ACCESS_TOKEN_EXPIRY = "15m";
 const REFRESH_TOKEN_EXPIRY = "7d";
 
+const encodedAccessTokenSecret = new TextEncoder().encode(ACCESS_TOKEN_SECRET);
+const encodedRefreshTokenSecret = new TextEncoder().encode(
+  REFRESH_TOKEN_SECRET,
+);
+
 export interface TokenPayload {
   userId: string;
   email: string;
   role: string;
 }
 
-export function generateAccessToken(payload: TokenPayload): string {
-  return jwt.sign(payload, ACCESS_TOKEN_SECRET, {
-    expiresIn: ACCESS_TOKEN_EXPIRY,
-  });
+export async function generateAccessToken(
+  payload: TokenPayload,
+): Promise<string> {
+  return await new jose.SignJWT({ ...payload })
+    .setProtectedHeader({ alg: "HS256" })
+    .setIssuedAt()
+    .setExpirationTime(ACCESS_TOKEN_EXPIRY)
+    .sign(encodedAccessTokenSecret);
 }
 
-export function generateRefreshToken(payload: TokenPayload): string {
-  return jwt.sign(payload, REFRESH_TOKEN_SECRET, {
-    expiresIn: REFRESH_TOKEN_EXPIRY,
-  });
+export async function generateRefreshToken(
+  payload: TokenPayload,
+): Promise<string> {
+  return await new jose.SignJWT({ ...payload })
+    .setProtectedHeader({ alg: "HS256" })
+    .setIssuedAt()
+    .setExpirationTime(REFRESH_TOKEN_EXPIRY)
+    .sign(encodedRefreshTokenSecret);
 }
 
-export function verifyAccessToken(token: string): TokenPayload | null {
+export async function verifyAccessToken(
+  token: string,
+): Promise<TokenPayload | null> {
   try {
-    return jwt.verify(token, ACCESS_TOKEN_SECRET) as TokenPayload;
+    const { payload } = await jose.jwtVerify(token, encodedAccessTokenSecret);
+    return payload as unknown as TokenPayload;
   } catch (error) {
     return null;
   }
 }
 
-export function verifyAccessTokenDetailed(
+export async function verifyAccessTokenDetailed(
   token: string,
-):
-  | { valid: true; payload: TokenPayload }
-  | { valid: false; expired: boolean } {
+): Promise<
+  { valid: true; payload: TokenPayload } | { valid: false; expired: boolean }
+> {
   try {
-    const payload = jwt.verify(token, ACCESS_TOKEN_SECRET) as TokenPayload;
-    return { valid: true, payload };
+    const { payload } = await jose.jwtVerify(token, encodedAccessTokenSecret);
+    return { valid: true, payload: payload as unknown as TokenPayload };
   } catch (error) {
     return {
       valid: false,
-      expired: error instanceof jwt.TokenExpiredError,
+      expired: (error as any).code === "ERR_JWT_EXPIRED",
     };
   }
 }
 
-export function verifyRefreshToken(token: string): TokenPayload | null {
+export async function verifyRefreshToken(
+  token: string,
+): Promise<TokenPayload | null> {
   try {
-    return jwt.verify(token, REFRESH_TOKEN_SECRET) as TokenPayload;
+    const { payload } = await jose.jwtVerify(token, encodedRefreshTokenSecret);
+    return payload as unknown as TokenPayload;
   } catch (error) {
     return null;
   }

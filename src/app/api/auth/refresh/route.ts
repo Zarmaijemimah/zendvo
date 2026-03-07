@@ -30,7 +30,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const payload = verifyRefreshToken(refreshToken);
+    const payload = await verifyRefreshToken(refreshToken);
     if (!payload) {
       return NextResponse.json(
         { success: false, error: "Invalid refresh token" },
@@ -68,8 +68,8 @@ export async function POST(request: NextRequest) {
       email: payload.email,
       role: payload.role,
     };
-    const newAccessToken = generateAccessToken(newPayload);
-    const newRefreshToken = generateRefreshToken(newPayload);
+    const newAccessToken = await generateAccessToken(newPayload);
+    const newRefreshToken = await generateRefreshToken(newPayload);
 
     await prisma.$transaction([
       prisma.refreshToken.delete({

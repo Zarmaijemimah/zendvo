@@ -8,7 +8,7 @@ const RESEND_COOLDOWN_MS = 60 * 1000;
 
 export async function POST(request: NextRequest) {
   try {
-    const payload = getAuthPayload(request);
+    const payload = await getAuthPayload(request);
     if (!payload) {
       return NextResponse.json(
         { success: false, error: "Unauthorized" },
@@ -51,8 +51,7 @@ export async function POST(request: NextRequest) {
       now - latestVerification.createdAt.getTime() < RESEND_COOLDOWN_MS
     ) {
       const retryAfterSeconds = Math.ceil(
-        (RESEND_COOLDOWN_MS -
-          (now - latestVerification.createdAt.getTime())) /
+        (RESEND_COOLDOWN_MS - (now - latestVerification.createdAt.getTime())) /
           1000,
       );
 

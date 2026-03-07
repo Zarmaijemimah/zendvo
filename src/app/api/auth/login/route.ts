@@ -25,7 +25,9 @@ type FailedAttemptState = {
 const failedAttemptsByIp = new Map<string, FailedAttemptState>();
 
 const getClientIp = (request: NextRequest): string => {
-  return request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "127.0.0.1";
+  return (
+    request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "127.0.0.1"
+  );
 };
 
 const isIpRateLimited = (ip: string): boolean => {
@@ -48,7 +50,10 @@ const registerFailedAttempt = (ip: string): void => {
   const now = Date.now();
   const attemptState = failedAttemptsByIp.get(ip);
 
-  if (!attemptState || now - attemptState.windowStartMs >= FAILED_ATTEMPT_WINDOW_MS) {
+  if (
+    !attemptState ||
+    now - attemptState.windowStartMs >= FAILED_ATTEMPT_WINDOW_MS
+  ) {
     failedAttemptsByIp.set(ip, { count: 1, windowStartMs: now });
     return;
   }
@@ -69,7 +74,10 @@ export async function POST(request: NextRequest) {
 
     if (isIpRateLimited(ip)) {
       return NextResponse.json(
-        { error: "Too many failed login attempts. Please try again in 1 minute." },
+        {
+          error:
+            "Too many failed login attempts. Please try again in 1 minute.",
+        },
         { status: 429 },
       );
     }
@@ -86,7 +94,10 @@ export async function POST(request: NextRequest) {
 
     const sanitizedEmail = sanitizeInput(String(email)).toLowerCase();
     if (!validateEmail(sanitizedEmail)) {
-      return NextResponse.json({ error: "Invalid email format" }, { status: 400 });
+      return NextResponse.json(
+        { error: "Invalid email format" },
+        { status: 400 },
+      );
     }
 
     const userRows = await db
@@ -104,21 +115,30 @@ export async function POST(request: NextRequest) {
 
     if (!user) {
       registerFailedAttempt(ip);
-      return NextResponse.json({ error: "Invalid email or password" }, { status: 401 });
+      return NextResponse.json(
+        { error: "Invalid email or password" },
+        { status: 401 },
+      );
     }
 
-    const isPasswordValid = await comparePassword(String(password), user.passwordHash);
+    const isPasswordValid = await comparePassword(
+      String(password),
+      user.passwordHash,
+    );
 
     if (!isPasswordValid) {
       registerFailedAttempt(ip);
-      return NextResponse.json({ error: "Invalid email or password" }, { status: 401 });
+      return NextResponse.json(
+        { error: "Invalid email or password" },
+        { status: 401 },
+      );
     }
 
     clearFailedAttempts(ip);
 
     const payload = { userId: user.id, email: user.email, role: user.role };
-    const accessToken = generateAccessToken(payload);
-    const refreshToken = generateRefreshToken(payload);
+    const accessToken = await generateAccessToken(payload);
+    const refreshToken = await generateRefreshToken(payload);
 
     await db.transaction(async (tx) => {
       await tx
@@ -160,6 +180,9 @@ export async function POST(request: NextRequest) {
     return response;
   } catch (error) {
     console.error("[LOGIN_ERROR]", error);
-    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+    return NextResponse.json(
+      { error: "Internal server error" },
+      { status: 500 },
+    );
   }
 }

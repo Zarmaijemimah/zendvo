@@ -20,12 +20,14 @@ type MockTransaction = {
   insert: typeof insertMock;
 };
 
-const transactionMock = jest.fn(async (callback: (tx: MockTransaction) => Promise<void>) => {
-  await callback({
-    update: updateMock,
-    insert: insertMock,
-  });
-});
+const transactionMock = jest.fn(
+  async (callback: (tx: MockTransaction) => Promise<void>) => {
+    await callback({
+      update: updateMock,
+      insert: insertMock,
+    });
+  },
+);
 
 jest.mock("drizzle-orm", () => ({
   eq: jest.fn(() => ({})),
@@ -53,8 +55,8 @@ jest.mock("@/lib/auth", () => ({
 }));
 
 jest.mock("@/lib/tokens", () => ({
-  generateAccessToken: jest.fn(() => "mock-access-token"),
-  generateRefreshToken: jest.fn(() => "mock-refresh-token"),
+  generateAccessToken: jest.fn(() => Promise.resolve("mock-access-token")),
+  generateRefreshToken: jest.fn(() => Promise.resolve("mock-refresh-token")),
 }));
 
 describe("POST /api/auth/login", () => {
@@ -87,7 +89,10 @@ describe("POST /api/auth/login", () => {
     (comparePassword as jest.Mock).mockResolvedValue(true);
 
     const response = await POST(
-      makeRequest({ email: "test@example.com", password: "Password123!" }, "10.0.0.1"),
+      makeRequest(
+        { email: "test@example.com", password: "Password123!" },
+        "10.0.0.1",
+      ),
     );
     const json = await response.json();
 
@@ -130,7 +135,10 @@ describe("POST /api/auth/login", () => {
     selectLimitMock.mockResolvedValue([]);
 
     const response = await POST(
-      makeRequest({ email: "unknown@example.com", password: "Password123!" }, "10.0.0.3"),
+      makeRequest(
+        { email: "unknown@example.com", password: "Password123!" },
+        "10.0.0.3",
+      ),
     );
     const json = await response.json();
 
@@ -147,13 +155,19 @@ describe("POST /api/auth/login", () => {
 
     for (let i = 0; i < 5; i += 1) {
       const response = await POST(
-        makeRequest({ email: "unknown@example.com", password: "wrong" }, "10.0.0.4"),
+        makeRequest(
+          { email: "unknown@example.com", password: "wrong" },
+          "10.0.0.4",
+        ),
       );
       expect(response.status).toBe(401);
     }
 
     const limitedResponse = await POST(
-      makeRequest({ email: "unknown@example.com", password: "wrong" }, "10.0.0.4"),
+      makeRequest(
+        { email: "unknown@example.com", password: "wrong" },
+        "10.0.0.4",
+      ),
     );
     const json = await limitedResponse.json();
 
