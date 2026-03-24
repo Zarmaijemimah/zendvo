@@ -154,6 +154,90 @@ export function verifyOTPHash(
   return crypto.timingSafeEqual(Buffer.from(hash), Buffer.from(storedHash));
 }
 
+export async function sendOTP(phoneNumber: string): Promise<{ success: boolean; message: string; error?: string }> {
+  try {
+    // Validate and sanitize phone number
+    if (!validateE164PhoneNumber(phoneNumber)) {
+      return {
+        success: false,
+        message: "Invalid phone number format. Please use E.164 format (e.g., +2348123456789)",
+        error: "INVALID_PHONE_FORMAT"
+      };
+    }
+
+    const sanitizedPhone = sanitizePhoneNumber(phoneNumber);
+
+    // Find user by phone number
+    const user = await db.query.users.findFirst({
+      where: eq(users.phoneNumber, sanitizedPhone),
+    });
+
+    if (!user) {
+      return {
+        success: false,
+        message: "User not found with this phone number",
+        error: "USER_NOT_FOUND"
+      };
+    }
+
+    if (user.status === "suspended") {
+      return {
+        success: false,
+        message: "Account suspended",
+        error: "ACCOUNT_SUSPENDED"
+      };
+    }
+
+    // Generate and store OTP
+    const otp = generateOTP();
+    await storeOTP(user.id, otp);
+
+    // TODO: Integrate with SMS provider (e.g., Twilio, AWS SNS)
+    // For now, we'll log the OTP (in production, this should send via SMS)
+    console.log(`[SMS_OTP] Phone: ${sanitizedPhone}, OTP: ${otp}`);
+
+    // Mock SMS sending - replace with actual SMS provider integration
+    const smsResult = await sendSMSViaProvider(sanitizedPhone, `Your Zendvo verification code is: ${otp}. Valid for 10 minutes.`);
+
+    if (!smsResult.success) {
+      console.error("Failed to send OTP SMS:", smsResult.error);
+      return {
+        success: false,
+        message: "Failed to send OTP SMS",
+        error: "SMS_SEND_FAILED"
+      };
+    }
+
+    console.log(`[AUDIT] SMS OTP sent to ${sanitizedPhone} for user ${user.id}`);
+
+    return {
+      success: true,
+      message: "OTP sent successfully via SMS"
+    };
+
+  } catch (error) {
+    console.error("[SEND_PHONE_OTP_ERROR]", error);
+    return {
+      success: false,
+      message: "Internal server error",
+      error: "INTERNAL_ERROR"
+    };
+  }
+}
+
+
+async function sendSMSViaProvider(phoneNumber: string, message: string): Promise<{ success: boolean; error?: string }> {
+  try {
+     });
+
+    // For now, simulate successful SMS sending
+    console.log(`[MOCK_SMS] To: ${phoneNumber}, Message: ${message}`);
+    return { success: true };
+  } catch (error) {
+    return { success: false, error: error instanceof Error ? error.message : "Unknown SMS error" };
+  }
+}
+
 export async function storeOTP(userId: string, otp: string) {
   const { salt, hash } = hashOTP(otp);
   const storedValue = `${salt}:${hash}`;
