@@ -2,8 +2,10 @@
 
 import React, { useEffect, useState } from "react";
 import Image from "next/image";
+import { Eye } from "lucide-react";
 import { PhoneInput } from "@/components/PhoneInput";
 import Button from "@/components/Button";
+import GiftPreviewModal from "@/components/gift/GiftPreviewModal";
 
 import UserProfile from "@/assets/images/user.png";
 
@@ -100,6 +102,7 @@ export default function SendGiftDetailsForm({
   const [message, setMessage] = useState(value?.message || "");
 
   const [isLoading, setIsLoading] = useState(false);
+  const [isPreviewOpen, setIsPreviewOpen] = useState(false);
 
   // Sync with parent component values
   useEffect(() => {
@@ -184,9 +187,9 @@ export default function SendGiftDetailsForm({
   const isFormValid = showOptionsOnly
     ? !dateTimeError
     : recipient !== null &&
-      rawAmount !== "" &&
-      parseFloat(rawAmount) > 0 &&
-      !dateTimeError;
+    rawAmount !== "" &&
+    parseFloat(rawAmount) > 0 &&
+    !dateTimeError;
 
   const handleAmountChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const parsed = parseNairaInput(e.target.value);
@@ -276,11 +279,10 @@ export default function SendGiftDetailsForm({
                     key={preset}
                     type="button"
                     onClick={() => handlePresetClick(preset)}
-                    className={`py-2 rounded-lg text-sm font-medium transition-colors border ${
-                      rawAmount === String(preset)
+                    className={`py-2 rounded-lg text-sm font-medium transition-colors border ${rawAmount === String(preset)
                         ? "bg-[#F1EDFF] border-[#5A42DE] text-[#5A42DE]"
                         : "bg-white border-[#E5E7EB] text-[#717182] hover:bg-gray-50"
-                    }`}
+                      }`}
                   >
                     ₦{preset}
                   </button>
@@ -352,28 +354,40 @@ export default function SendGiftDetailsForm({
             />
           </div>
 
-          {/* Navigation Buttons */}
-          <div className="flex gap-3 mt-6">
-            {showOptionsOnly && onBack && (
-              <Button
-                onClick={onBack}
-                disabled={isLoading}
-                className="flex-1 h-12 rounded-xl bg-white border border-[#E5E7EB] text-[#18181B] text-[15px] font-semibold hover:bg-gray-50 transition-all duration-200"
-              >
-                Back
-              </Button>
-            )}
-            <Button
-              onClick={handleContinue}
-              disabled={!isFormValid || isLoading}
-              isLoading={isLoading}
-              className={`h-12 rounded-xl bg-[#5A42DE] hover:bg-[#4E37CC] text-white text-[15px] font-semibold transition-all duration-200 disabled:opacity-50 ${
-                showOptionsOnly && onBack ? "flex-1" : "w-full"
-              }`}
-            >
-              Continue
-            </Button>
-          </div>
+          {/* Preview Link */}
+          <button
+            type="button"
+            onClick={() => setIsPreviewOpen(true)}
+            className="w-full flex items-center justify-center gap-1.5 text-[13px] text-[#5A42DE] font-medium hover:text-[#4E37CC] transition-colors py-1"
+          >
+            <Eye size={15} strokeWidth={2} />
+            Preview recipient's view
+          </button>
+
+          {/* Submit Button */}
+          <Button
+            onClick={handleContinue}
+            disabled={!isFormValid || isLoading}
+            isLoading={isLoading}
+            className="w-full h-12 mt-2 rounded-xl bg-[#5A42DE] hover:bg-[#4E37CC] text-white text-[15px] font-semibold transition-all duration-200 disabled:opacity-50"
+          >
+            Continue
+          </Button>
+
+          {/* Gift Preview Modal */}
+          <GiftPreviewModal
+            isOpen={isPreviewOpen}
+            onClose={() => setIsPreviewOpen(false)}
+            data={{
+              recipientName: recipient?.name ?? "",
+              amount: rawAmount,
+              currency: "NGN",
+              message,
+              hideAmount,
+              unlockDate: date,
+              unlockTime: time,
+            }}
+          />
         </div>
       </div>
     </div>
