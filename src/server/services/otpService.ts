@@ -2,8 +2,130 @@ import bcrypt from "bcryptjs";
 import crypto from "crypto";
 import { db } from "@/lib/db";
 import { users, emailVerifications, gifts } from "@/lib/db/schema";
-import { eq, and, desc, lt, or } from "drizzle-orm";
-import { sanitizePhoneNumber, validateE164PhoneNumber } from "@/lib/validation";
+import { eq, and, desc, lt, or, gt, sql } from "drizzle-orm";
+
+export const MAX_OTP_REQUESTS_PER_PHONE = 4;
+export const OTP_RATE_LIMIT_WINDOW_MS = 10 * 60 * 1000;
+
+export interface OTPRateLimitResult {
+  allowed: boolean;
+  remainingRequests: number;
+  retryAfterMs: number;
+  message?: string;
+}
+
+export async function checkOTPRequestRateLimit(
+  phoneNumber: string,
+): Promise<OTPRateLimitResult> {
+  const windowStart = new Date(Date.now() - OTP_RATE_LIMIT_WINDOW_MS);
+
+  const user = await db.query.users.findFirst({
+    where: eq(users.phoneNumber, phoneNumber),
+    columns: { id: true },
+  });
+
+  if (!user) {
+    return {
+      allowed: true,
+      remainingRequests: MAX_OTP_REQUESTS_PER_PHONE,
+      retryAfterMs: 0,
+    };
+  }
+
+  const recentOTPs = await db
+    .select({ count: sql<number>`count(*)::int` })
+    .from(emailVerifications)
+    .where(
+      and(
+        eq(emailVerifications.userId, user.id),
+        gt(emailVerifications.createdAt, windowStart),
+      ),
+    );
+
+  const otpCount = recentOTPs[0]?.count ?? 0;
+
+  if (otpCount >= MAX_OTP_REQUESTS_PER_PHONE) {
+    const oldestOTP = await db.query.emailVerifications.findFirst({
+      where: and(
+        eq(emailVerifications.userId, user.id),
+        gt(emailVerifications.createdAt, windowStart),
+      ),
+      orderBy: [emailVerifications.createdAt],
+      columns: { createdAt: true },
+    });
+
+    const retryAfterMs = oldestOTP
+      ? Math.max(
+          0,
+          OTP_RATE_LIMIT_WINDOW_MS -
+            (Date.now() - new Date(oldestOTP.createdAt).getTime()),
+        )
+      : OTP_RATE_LIMIT_WINDOW_MS;
+
+    return {
+      allowed: false,
+      remainingRequests: 0,
+      retryAfterMs,
+      message: `Too many OTP requests. Please wait ${Math.ceil(retryAfterMs / 60000)} minutes before requesting a new code.`,
+    };
+  }
+
+  return {
+    allowed: true,
+    remainingRequests: MAX_OTP_REQUESTS_PER_PHONE - otpCount - 1,
+    retryAfterMs: 0,
+  };
+}
+
+export async function checkOTPRequestRateLimitByUserId(
+  userId: string,
+): Promise<OTPRateLimitResult> {
+  const windowStart = new Date(Date.now() - OTP_RATE_LIMIT_WINDOW_MS);
+
+  const recentOTPs = await db
+    .select({ count: sql<number>`count(*)::int` })
+    .from(emailVerifications)
+    .where(
+      and(
+        eq(emailVerifications.userId, userId),
+        gt(emailVerifications.createdAt, windowStart),
+      ),
+    );
+
+  const otpCount = recentOTPs[0]?.count ?? 0;
+
+  if (otpCount >= MAX_OTP_REQUESTS_PER_PHONE) {
+    const oldestOTP = await db.query.emailVerifications.findFirst({
+      where: and(
+        eq(emailVerifications.userId, userId),
+        gt(emailVerifications.createdAt, windowStart),
+      ),
+      orderBy: [emailVerifications.createdAt],
+      columns: { createdAt: true },
+    });
+
+    const retryAfterMs = oldestOTP
+      ? Math.max(
+          0,
+          OTP_RATE_LIMIT_WINDOW_MS -
+            (Date.now() - new Date(oldestOTP.createdAt).getTime()),
+        )
+      : OTP_RATE_LIMIT_WINDOW_MS;
+
+    return {
+      allowed: false,
+      remainingRequests: 0,
+      retryAfterMs,
+      message: `Too many OTP requests. Please wait ${Math.ceil(retryAfterMs / 60000)} minutes before requesting a new code.`,
+    };
+  }
+
+  return {
+    allowed: true,
+    remainingRequests: MAX_OTP_REQUESTS_PER_PHONE - otpCount - 1,
+    retryAfterMs: 0,
+  };
+}
 
 export function generateOTP(): string {
   // CSPRNG compliant
@@ -152,6 +274,11 @@ export async function storeOTP(userId: string, otp: string) {
       isUsed: false,
     })
     .returning();
+
+  await db
+    .update(users)
+    .set({ lastOtpSentAt: new Date() })
+    .where(eq(users.id, userId));
 
   return newVerification;
 }
