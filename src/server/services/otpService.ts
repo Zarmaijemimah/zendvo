@@ -3,6 +3,8 @@ import crypto from "crypto";
 import { db } from "@/lib/db";
 import { users, emailVerifications, gifts } from "@/lib/db/schema";
 import { eq, and, desc, lt, or, gt, sql } from "drizzle-orm";
+import { validatePhoneCountryCode } from "@/lib/validations/auth";
+import { validateE164PhoneNumber, sanitizePhoneNumber } from "@/lib/validation";
 
 export const MAX_OTP_REQUESTS_PER_PHONE = 4;
 export const OTP_RATE_LIMIT_WINDOW_MS = 10 * 60 * 1000;
@@ -165,6 +167,15 @@ export async function sendOTP(phoneNumber: string): Promise<{ success: boolean; 
       };
     }
 
+    const countryValidation = validatePhoneCountryCode(phoneNumber);
+    if (!countryValidation.isValid) {
+      return {
+        success: false,
+        message: countryValidation.message!,
+        error: "UNSUPPORTED_COUNTRY"
+      };
+    }
+
     const sanitizedPhone = sanitizePhoneNumber(phoneNumber);
 
     // Find user by phone number
@@ -228,8 +239,6 @@ export async function sendOTP(phoneNumber: string): Promise<{ success: boolean; 
 
 async function sendSMSViaProvider(phoneNumber: string, message: string): Promise<{ success: boolean; error?: string }> {
   try {
-     });
-
     // For now, simulate successful SMS sending
     console.log(`[MOCK_SMS] To: ${phoneNumber}, Message: ${message}`);
     return { success: true };
