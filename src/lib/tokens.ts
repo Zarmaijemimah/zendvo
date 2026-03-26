@@ -34,6 +34,7 @@ export async function generateRefreshToken(
 ): Promise<string> {
   return await new jose.SignJWT({ ...payload })
     .setProtectedHeader({ alg: "HS256" })
+    .setJti(crypto.randomUUID())
     .setIssuedAt()
     .setExpirationTime(REFRESH_TOKEN_EXPIRY)
     .sign(encodedRefreshTokenSecret);

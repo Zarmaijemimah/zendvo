@@ -141,3 +141,23 @@ export async function completePasswordReset(input: {
 
   await db.delete(refreshTokens).where(eq(refreshTokens.userId, input.userId));
 }
+
+export async function findRefreshToken(token: string) {
+  return await db.query.refreshTokens.findFirst({
+    where: eq(refreshTokens.token, token),
+  });
+}
+
+export async function revokeRefreshToken(tokenId: string) {
+  await db
+    .update(refreshTokens)
+    .set({ revokedAt: new Date() })
+    .where(eq(refreshTokens.id, tokenId));
+}
+
+export async function revokeAllUserRefreshTokens(userId: string) {
+  await db
+    .update(refreshTokens)
+    .set({ revokedAt: new Date() })
+    .where(eq(refreshTokens.userId, userId));
+}
