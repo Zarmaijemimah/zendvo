@@ -52,6 +52,7 @@ export const gifts = sqliteTable("Gift", {
   transactionId: text("transactionId"),
   hideAmount: integer("hideAmount", { mode: "boolean" }).notNull().default(false),
   hideSender: integer("hideSender", { mode: "boolean" }).notNull().default(false),
+  isAnonymous: integer("isAnonymous", { mode: "boolean" }).notNull().default(false),
   unlockDatetime: text("unlockDatetime"),
   senderName: text("senderName"),
   senderEmail: text("senderEmail"),

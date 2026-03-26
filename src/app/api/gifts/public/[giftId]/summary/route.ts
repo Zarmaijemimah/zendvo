@@ -62,7 +62,7 @@ export async function GET(
           },
           unlockDatetime: gift.unlockDatetime,
           message: gift.message,
-          senderName: gift.sender?.name ?? gift.senderName ?? null,
+          senderName: gift.isAnonymous ? "Anonymous" : (gift.sender?.name ?? gift.senderName ?? null),
         },
       },
       { status: 200 },
