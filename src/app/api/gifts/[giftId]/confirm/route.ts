@@ -68,22 +68,24 @@ export async function POST(
         {
           success: false,
           error: `Gift must be confirmed before completion. Current status: ${gift.status}`,
+          error: `Gift must be confirmed before completion. Current status: ${gift.status}`,
         },
         { status: 400 },
       );
     }
 
     // Verify payment before proceeding with on-chain operations
-    if (gift.paymentReference && gift.paymentProvider) {
+    const giftData = gift as any;
+    if (giftData.paymentReference && giftData.paymentProvider) {
       try {
         let verificationResult;
         let isPaymentSuccessful;
 
-        if (gift.paymentProvider === "paystack") {
-          verificationResult = await verifyPaystackPayment(gift.paymentReference);
+        if (giftData.paymentProvider === "paystack") {
+          verificationResult = await verifyPaystackPayment(giftData.paymentReference);
           isPaymentSuccessful = isPaystackPaymentSuccessful(verificationResult.status);
-        } else if (gift.paymentProvider === "stripe") {
-          verificationResult = await verifyStripePayment(gift.paymentReference);
+        } else if (giftData.paymentProvider === "stripe") {
+          verificationResult = await verifyStripePayment(giftData.paymentReference);
           isPaymentSuccessful = isStripePaymentSuccessful(verificationResult.status);
         } else {
           return NextResponse.json(
@@ -106,7 +108,7 @@ export async function POST(
         // Update gift with payment verification timestamp
         await db
           .update(gifts)
-          .set({ paymentVerifiedAt: new Date() })
+          .set({ paymentVerifiedAt: new Date() } as any)
           .where(eq(gifts.id, giftId));
       } catch (error) {
         console.error("Payment verification error:", error);
