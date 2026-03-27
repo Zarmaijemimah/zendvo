@@ -1,15 +1,17 @@
+import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { gifts, users } from "@/lib/db/schema";
+import { users, gifts } from "@/lib/db/schema";
+import { eq } from "drizzle-orm";
 import {
-  sanitizeInput,
   validateAmount,
   validateCurrency,
+  sanitizeInput,
   validateMessage,
+  validateUnlockAt,
 } from "@/lib/validation";
-import { sendGiftConfirmationOTP } from "@/server/services/emailService";
 import { generateOTP, storeGiftOTP } from "@/server/services/otpService";
-import { eq } from "drizzle-orm";
-import { NextRequest, NextResponse } from "next/server";
+import { sendGiftConfirmationOTP } from "@/server/services/emailService";
+import { generateUniqueSlug } from "@/lib/slug";
 
 export async function GET() {
   return NextResponse.json({ gifts: [] });
@@ -28,14 +30,7 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const {
-      recipient,
-      amount,
-      currency = "USDC",
-      message,
-      template,
-      coverImageId,
-    } = body;
+    const { recipient, amount, currency = "USDC", message, template, coverImageId, unlock_at } = body;
 
     // Validate required fields
     if (!recipient || !amount) {
@@ -90,9 +85,7 @@ export async function POST(request: NextRequest) {
     // Sanitize optional fields
     const sanitizedMessage = message ? sanitizeInput(message) : null;
     const sanitizedTemplate = template ? sanitizeInput(template) : null;
-    const sanitizedCoverImageId = coverImageId
-      ? sanitizeInput(String(coverImageId))
-      : null;
+    const sanitizedCoverImageId = coverImageId ? sanitizeInput(String(coverImageId)) : null;
 
     // Validate message length
     if (!validateMessage(sanitizedMessage)) {
@@ -101,6 +94,20 @@ export async function POST(request: NextRequest) {
         { status: 400 },
       );
     }
+
+    // Validate unlock_at if provided
+    if (unlock_at) {
+      const unlockValidation = validateUnlockAt(unlock_at);
+      if (!unlockValidation.valid) {
+        return NextResponse.json(
+          { success: false, error: unlockValidation.error },
+          { status: 400 },
+        );
+      }
+    }
+
+    // Generate short link slug
+    const slug = await generateUniqueSlug();
 
     // Create gift record
     const [newGift] = await db
@@ -113,7 +120,9 @@ export async function POST(request: NextRequest) {
         message: sanitizedMessage,
         template: sanitizedTemplate,
         coverImageId: sanitizedCoverImageId,
-        status: "PENDING",
+        unlockDatetime: unlock_at ? new Date(unlock_at) : null,
+        status: "pending_otp",
+        slug,
       })
       .returning();
 
@@ -139,7 +148,8 @@ export async function POST(request: NextRequest) {
       {
         success: true,
         giftId: newGift.id,
-        status: "PENDING",
+        status: "pending_otp",
+        slug: newGift.slug,
       },
       { status: 201 },
     );

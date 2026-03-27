@@ -19,11 +19,13 @@ export const userStatusEnum = pgEnum("user_status", [
   "suspended",
 ]);
 export const giftStatusEnum = pgEnum("gift_status", [
-  "PENDING",
-  "FUNDED",
-  "LOCKED",
-  "UNLOCKED",
-  "CLAIMED",
+  "pending_otp",
+  "otp_verified",
+  "pending_review",
+  "confirmed",
+  "completed",
+  "sent",
+  "failed",
 ]);
 
 // Tables
@@ -47,9 +49,13 @@ export const users = pgTable(
     updatedAt: timestamp("updated_at").defaultNow().notNull(),
     lastLogin: timestamp("last_login"),
     lastOtpSentAt: timestamp("last_otp_sent_at"),
+    isPhoneVerified: boolean("is_phone_verified").default(false).notNull(),
   },
   (table) => {
     return [
+      unique("users_phone_number_unique").on(table.phoneNumber),
+      unique("users_email_unique").on(table.email),
+      unique("users_username_unique").on(table.username),
       index("users_status_idx").on(table.status),
       index("users_created_at_idx").on(table.createdAt),
     ];
@@ -110,6 +116,7 @@ export const refreshTokens = pgTable(
     createdAt: timestamp("created_at").defaultNow().notNull(),
     revokedAt: timestamp("revoked_at"),
     deviceInfo: text("device_info"),
+    deviceId: text("device_id"),
   },
   (table) => {
     return [index("rt_user_id_idx").on(table.userId)];
@@ -128,7 +135,7 @@ export const gifts = pgTable(
     currency: text("currency").notNull(),
     message: text("message"),
     template: text("template"),
-    status: giftStatusEnum("status").default("PENDING").notNull(),
+    status: giftStatusEnum("status").default("pending_otp").notNull(),
     otpHash: text("otp_hash"),
     otpExpiresAt: timestamp("otp_expires_at"),
     otpAttempts: integer("otp_attempts").default(0).notNull(),
@@ -141,6 +148,7 @@ export const gifts = pgTable(
     senderAvatar: text("sender_avatar"),
     shareLink: text("share_link").unique(),
     shareLinkToken: text("share_link_token").unique(),
+    slug: text("slug").unique(),
     coverImageId: text("cover_image_id"),
     linkExpiresAt: timestamp("link_expires_at"),
     completedAt: timestamp("completed_at"),
@@ -157,6 +165,7 @@ export const gifts = pgTable(
         table.recipientId,
       ),
       index("gift_share_link_token_idx").on(table.shareLinkToken),
+      index("gift_slug_idx").on(table.slug),
     ];
   },
 );

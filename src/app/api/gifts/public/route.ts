@@ -1,16 +1,17 @@
+import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { gifts, users } from "@/lib/db/schema";
-import { validateHoneypot } from "@/lib/honeypot";
-import { isRateLimited } from "@/lib/rate-limiter";
+import { users, gifts } from "@/lib/db/schema";
+import { eq, and, gte } from "drizzle-orm";
 import {
-  sanitizeInput,
   validateAmount,
   validateCurrency,
   validateEmail,
   validateFutureDatetime,
+  sanitizeInput,
 } from "@/lib/validation";
-import { and, eq, gte } from "drizzle-orm";
-import { NextRequest, NextResponse } from "next/server";
+import { isRateLimited } from "@/lib/rate-limiter";
+import { validateHoneypot } from "@/lib/honeypot";
+import { generateUniqueSlug } from "@/lib/slug";
 
 const MAX_MESSAGE_LENGTH = 500;
 
@@ -157,6 +158,8 @@ export async function POST(request: NextRequest) {
       ? sanitizeInput(senderAvatar)
       : null;
 
+    const slug = await generateUniqueSlug();
+
     const [newGift] = await db
       .insert(gifts)
       .values({
@@ -164,17 +167,18 @@ export async function POST(request: NextRequest) {
         amount,
         currency: currency.toUpperCase(),
         message: sanitizedMessage,
-        status: "PENDING",
+        status: "pending_review",
         hideAmount: hideAmount ?? false,
         unlockDatetime: unlockDatetime ? new Date(unlockDatetime) : null,
         senderName: sanitizedSenderName,
         senderEmail: sanitizedSenderEmail,
         senderAvatar: sanitizedSenderAvatar,
+        slug,
       })
       .returning();
 
     return NextResponse.json(
-      { success: true, data: { giftId: newGift.id, status: "PENDING" } },
+      { success: true, data: { giftId: newGift.id, status: "pending_review", slug: newGift.slug } },
       { status: 201 },
     );
   } catch (error) {

@@ -1,11 +1,14 @@
-import { db } from "@/lib/db";
-import { emailVerifications, gifts, users } from "@/lib/db/schema";
-import { sanitizePhoneNumber, validateE164PhoneNumber } from "@/lib/validation";
-import { validatePhoneCountryCode } from "@/lib/validations/auth";
 import bcrypt from "bcryptjs";
 import crypto from "crypto";
-import { and, desc, eq, gt, lt, or, sql } from "drizzle-orm";
-import { AuditEventType, logGiftOTPEvent, logOTPEvent } from "./auditService";
+import { db } from "@/lib/db";
+import { users, emailVerifications, gifts } from "@/lib/db/schema";
+import { eq, and, desc, lt, or, gt, sql } from "drizzle-orm";
+import { validateE164PhoneNumber, sanitizePhoneNumber } from "@/lib/validation";
+import {
+  AuditEventType,
+  logGiftOTPEvent,
+  logOTPEvent,
+} from "@/server/services/auditService";
 
 export const MAX_OTP_REQUESTS_PER_PHONE = 4;
 export const OTP_RATE_LIMIT_WINDOW_MS = 10 * 60 * 1000;
@@ -154,29 +157,21 @@ export function verifyOTPHash(
 ): boolean {
   const hash = crypto.createHmac("sha256", salt).update(otp).digest("hex");
 
+  if (hash.length !== storedHash.length) {
+    return false;
+  }
+
   return crypto.timingSafeEqual(Buffer.from(hash), Buffer.from(storedHash));
 }
 
-export async function sendOTP(
-  phoneNumber: string,
-): Promise<{ success: boolean; message: string; error?: string }> {
+export async function sendOTP(phoneNumber: string): Promise<{ success: boolean; message: string; error?: string }> {
   try {
     // Validate and sanitize phone number
     if (!validateE164PhoneNumber(phoneNumber)) {
       return {
         success: false,
-        message:
-          "Invalid phone number format. Please use E.164 format (e.g., +2348123456789)",
-        error: "INVALID_PHONE_FORMAT",
-      };
-    }
-
-    const countryValidation = validatePhoneCountryCode(phoneNumber);
-    if (!countryValidation.isValid) {
-      return {
-        success: false,
-        message: countryValidation.message!,
-        error: "UNSUPPORTED_COUNTRY",
+        message: "Invalid phone number format. Please use E.164 format (e.g., +2348123456789)",
+        error: "INVALID_PHONE_FORMAT"
       };
     }
 
@@ -191,7 +186,7 @@ export async function sendOTP(
       return {
         success: false,
         message: "User not found with this phone number",
-        error: "USER_NOT_FOUND",
+        error: "USER_NOT_FOUND"
       };
     }
 
@@ -199,7 +194,7 @@ export async function sendOTP(
       return {
         success: false,
         message: "Account suspended",
-        error: "ACCOUNT_SUSPENDED",
+        error: "ACCOUNT_SUSPENDED"
       };
     }
 
@@ -212,51 +207,42 @@ export async function sendOTP(
     console.log(`[SMS_OTP] Phone: ${sanitizedPhone}, OTP: ${otp}`);
 
     // Mock SMS sending - replace with actual SMS provider integration
-    const smsResult = await sendSMSViaProvider(
-      sanitizedPhone,
-      `Your Zendvo verification code is: ${otp}. Valid for 10 minutes.`,
-    );
+    const smsResult = await sendSMSViaProvider(sanitizedPhone, `Your Zendvo verification code is: ${otp}. Valid for 10 minutes.`);
 
     if (!smsResult.success) {
       console.error("Failed to send OTP SMS:", smsResult.error);
       return {
         success: false,
         message: "Failed to send OTP SMS",
-        error: "SMS_SEND_FAILED",
+        error: "SMS_SEND_FAILED"
       };
     }
 
-    console.log(
-      `[AUDIT] SMS OTP sent to ${sanitizedPhone} for user ${user.id}`,
-    );
+    console.log(`[AUDIT] SMS OTP sent to ${sanitizedPhone} for user ${user.id}`);
 
     return {
       success: true,
-      message: "OTP sent successfully via SMS",
+      message: "OTP sent successfully via SMS"
     };
+
   } catch (error) {
     console.error("[SEND_PHONE_OTP_ERROR]", error);
     return {
       success: false,
       message: "Internal server error",
-      error: "INTERNAL_ERROR",
+      error: "INTERNAL_ERROR"
     };
   }
 }
 
-async function sendSMSViaProvider(
-  phoneNumber: string,
-  message: string,
-): Promise<{ success: boolean; error?: string }> {
+
+async function sendSMSViaProvider(phoneNumber: string, message: string): Promise<{ success: boolean; error?: string }> {
   try {
     // For now, simulate successful SMS sending
     console.log(`[MOCK_SMS] To: ${phoneNumber}, Message: ${message}`);
     return { success: true };
   } catch (error) {
-    return {
-      success: false,
-      error: error instanceof Error ? error.message : "Unknown SMS error",
-    };
+    return { success: false, error: error instanceof Error ? error.message : "Unknown SMS error" };
   }
 }
 
@@ -455,6 +441,7 @@ export async function verifyOTP(userId: string, otp: string) {
       loginAttempts: 0,
       otpFailedAttempts: 0,
       otpAttemptsWindowStart: null,
+      isPhoneVerified: true,
     })
     .where(eq(users.id, userId));
 
@@ -567,7 +554,7 @@ export async function verifyGiftOTP(
   await db
     .update(gifts)
     .set({
-      status: "FUNDED",
+      status: "otp_verified",
       otpHash: null,
       otpExpiresAt: null,
       otpAttempts: 0,
