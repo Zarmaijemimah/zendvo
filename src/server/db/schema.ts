@@ -1,4 +1,4 @@
-import { integer, real, pgTable, text, timestamp, boolean } from "drizzle-orm/pg-core";
+import { boolean, index, integer, pgTable, real, text } from "drizzle-orm/pg-core";
 
 export const users = pgTable("User", {
   id: text("id").primaryKey(),
@@ -50,6 +50,7 @@ export const gifts = pgTable("Gift", {
   otpExpiresAt: text("otpExpiresAt"),
   otpAttempts: integer("otpAttempts").notNull().default(0),
   transactionId: text("transactionId"),
+  blockchainTxHash: text("blockchain_tx_hash"),
   hideAmount: boolean("hideAmount").notNull().default(false),
   hideSender: boolean("hideSender").notNull().default(false),
   isAnonymous: boolean("isAnonymous").notNull().default(false),
@@ -59,7 +60,9 @@ export const gifts = pgTable("Gift", {
   senderAvatar: text("senderAvatar"),
   createdAt: text("createdAt").notNull(),
   updatedAt: text("updatedAt").notNull(),
-});
+}, (table) => ({
+  blockchainTxHashIdx: index("blockchain_tx_hash_idx").on(table.blockchainTxHash),
+}));
 
 export const wallets = pgTable("Wallet", {
   id: text("id").primaryKey(),

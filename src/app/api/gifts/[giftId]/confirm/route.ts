@@ -23,6 +23,9 @@ export async function POST(
 
     const { giftId } = await params;
 
+    const body = await request.json().catch(() => ({}));
+    const blockchainTxHash = body.blockchain_tx_hash || body.blockchainTxHash || null;
+
     // Fetch the gift with sender info
     const gift = await db.query.gifts.findFirst({
       where: eq(gifts.id, giftId),
@@ -47,24 +50,24 @@ export async function POST(
       );
     }
 
-    // Idempotency: already claimed
-    if (gift.status === "CLAIMED") {
+    // Idempotency: already completed/sent
+    if (gift.status === "completed" || gift.status === "sent") {
       return NextResponse.json(
         {
           success: false,
-          error: "Gift has already been claimed",
+          error: "Gift has already been completed",
           transactionId: gift.transactionId,
         },
         { status: 409 },
       );
     }
 
-    // Must be FUNDED to proceed
-    if (gift.status !== "FUNDED") {
+    // Must be confirmed to proceed with settlement
+    if (gift.status !== "confirmed") {
       return NextResponse.json(
         {
           success: false,
-          error: `Gift must be funded before confirmation. Current status: ${gift.status}`,
+          error: `Gift must be confirmed before completion. Current status: ${gift.status}`,
         },
         { status: 400 },
       );
@@ -170,7 +173,7 @@ export async function POST(
       // Update gift status to CLAIMED
       await tx
         .update(gifts)
-        .set({ status: "CLAIMED", transactionId })
+        .set({ status: "completed", transactionId, blockchainTxHash })
         .where(eq(gifts.id, giftId));
     });
 
@@ -190,7 +193,7 @@ export async function POST(
     return NextResponse.json(
       {
         success: true,
-        status: "CLAIMED",
+        status: "completed",
         transactionId,
         shareLink,
       },
