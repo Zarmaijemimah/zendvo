@@ -1,9 +1,11 @@
-import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { gifts, wallets } from "@/lib/db/schema";
-import { eq, and, sql } from "drizzle-orm";
 import { notifyGiftCompleted } from "@/server/services/notificationService";
+import { verifyPayment as verifyPaystackPayment, isPaymentSuccessful as isPaystackPaymentSuccessful } from "@/lib/paystack/api";
+import { verifyPayment as verifyStripePayment, isPaymentSuccessful as isStripePaymentSuccessful } from "@/lib/stripe/client";
 import crypto from "crypto";
+import { and, eq, sql } from "drizzle-orm";
+import { NextRequest, NextResponse } from "next/server";
 
 export async function POST(
   request: NextRequest,
@@ -45,27 +47,74 @@ export async function POST(
       );
     }
 
-    // Idempotency: already completed
-    if (gift.status === "completed") {
+    // Idempotency: already claimed
+    if (gift.status === "CLAIMED") {
       return NextResponse.json(
         {
           success: false,
-          error: "Gift has already been confirmed",
+          error: "Gift has already been claimed",
           transactionId: gift.transactionId,
         },
         { status: 409 },
       );
     }
 
-    // Must be otp_verified to proceed
-    if (gift.status !== "otp_verified") {
+    // Must be FUNDED to proceed
+    if (gift.status !== "FUNDED") {
       return NextResponse.json(
         {
           success: false,
-          error: `Gift must be OTP-verified before confirmation. Current status: ${gift.status}`,
+          error: `Gift must be funded before confirmation. Current status: ${gift.status}`,
         },
         { status: 400 },
       );
+    }
+
+    // Verify payment before proceeding with on-chain operations
+    if (gift.paymentReference && gift.paymentProvider) {
+      try {
+        let verificationResult;
+        let isPaymentSuccessful;
+
+        if (gift.paymentProvider === "paystack") {
+          verificationResult = await verifyPaystackPayment(gift.paymentReference);
+          isPaymentSuccessful = isPaystackPaymentSuccessful(verificationResult.status);
+        } else if (gift.paymentProvider === "stripe") {
+          verificationResult = await verifyStripePayment(gift.paymentReference);
+          isPaymentSuccessful = isStripePaymentSuccessful(verificationResult.status);
+        } else {
+          return NextResponse.json(
+            { success: false, error: "Unsupported payment provider" },
+            { status: 400 },
+          );
+        }
+
+        if (!isPaymentSuccessful) {
+          return NextResponse.json(
+            {
+              success: false,
+              error: `Payment verification failed. Payment status: ${verificationResult.status}`,
+              paymentStatus: verificationResult.status,
+            },
+            { status: 402 },
+          );
+        }
+
+        // Update gift with payment verification timestamp
+        await db
+          .update(gifts)
+          .set({ paymentVerifiedAt: new Date() })
+          .where(eq(gifts.id, giftId));
+      } catch (error) {
+        console.error("Payment verification error:", error);
+        return NextResponse.json(
+          {
+            success: false,
+            error: "Payment verification failed. Please try again.",
+          },
+          { status: 402 },
+        );
+      }
     }
 
     // Check sender wallet balance
@@ -118,10 +167,10 @@ export async function POST(
           },
         });
 
-      // Update gift status to completed
+      // Update gift status to CLAIMED
       await tx
         .update(gifts)
-        .set({ status: "completed", transactionId })
+        .set({ status: "CLAIMED", transactionId })
         .where(eq(gifts.id, giftId));
     });
 
@@ -141,7 +190,7 @@ export async function POST(
     return NextResponse.json(
       {
         success: true,
-        status: "completed",
+        status: "CLAIMED",
         transactionId,
         shareLink,
       },

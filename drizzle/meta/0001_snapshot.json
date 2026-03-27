@@ -1,5 +1,6 @@
 {
   "id": "c1741252-56d2-4825-8029-24386ef6a311",
+  "id": "7713c465-d6e7-412d-97a3-3868c3e42b6a",
   "prevId": "56a44295-676d-4e3e-b641-44e3341addf1",
   "version": "7",
   "dialect": "postgresql",
@@ -162,6 +163,7 @@
           "primaryKey": false,
           "notNull": true,
           "default": "'pending_otp'"
+          "default": "'PENDING'"
         },
         "otp_hash": {
           "name": "otp_hash",
@@ -934,6 +936,18 @@
           "nullsNotDistinct": false,
           "columns": [
             "email"
+        "users_email_unique": {
+          "name": "users_email_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "email"
+          ]
+        },
+        "users_phone_number_unique": {
+          "name": "users_phone_number_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "phone_number"
           ]
         },
         "users_username_unique": {
@@ -1053,6 +1067,11 @@
         "completed",
         "sent",
         "failed"
+        "PENDING",
+        "FUNDED",
+        "LOCKED",
+        "UNLOCKED",
+        "CLAIMED"
       ]
     },
     "public.user_status": {
