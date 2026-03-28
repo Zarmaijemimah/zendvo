@@ -140,6 +140,7 @@ export const gifts = pgTable(
     otpExpiresAt: timestamp("otp_expires_at"),
     otpAttempts: integer("otp_attempts").default(0).notNull(),
     transactionId: text("transaction_id").unique(),
+    blockchainTxHash: text("blockchain_tx_hash"),
     paymentReference: text("payment_reference"),
     paymentProvider: text("payment_provider"),
     paymentVerifiedAt: timestamp("payment_verified_at"),
@@ -168,7 +169,6 @@ export const gifts = pgTable(
         table.recipientId,
       ),
       index("gift_share_link_token_idx").on(table.shareLinkToken),
-      index("gift_slug_idx").on(table.slug),
     ];
   },
 );

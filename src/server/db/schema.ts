@@ -1,4 +1,4 @@
-import { integer, real, sqliteTable, text } from "drizzle-orm/sqlite-core";
+import { integer, real, sqliteTable, text, index } from "drizzle-orm/sqlite-core";
 
 export const users = sqliteTable("User", {
   id: text("id").primaryKey(),
@@ -50,6 +50,7 @@ export const gifts = sqliteTable("Gift", {
   otpExpiresAt: text("otpExpiresAt"),
   otpAttempts: integer("otpAttempts").notNull().default(0),
   transactionId: text("transactionId"),
+  blockchainTxHash: text("blockchain_tx_hash"),
   hideAmount: integer("hideAmount", { mode: "boolean" }).notNull().default(false),
   hideSender: integer("hideSender", { mode: "boolean" }).notNull().default(false),
   isAnonymous: integer("isAnonymous", { mode: "boolean" }).notNull().default(false),
@@ -59,7 +60,9 @@ export const gifts = sqliteTable("Gift", {
   senderAvatar: text("senderAvatar"),
   createdAt: text("createdAt").notNull(),
   updatedAt: text("updatedAt").notNull(),
-});
+}, (table) => ({
+  blockchainTxHashIdx: index("blockchain_tx_hash_idx").on(table.blockchainTxHash),
+}));
 
 export const wallets = sqliteTable("Wallet", {
   id: text("id").primaryKey(),
