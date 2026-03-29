@@ -93,9 +93,11 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Calculate platform fee (2%)
-    const fee = calculateFee(amount);
-    const totalAmount = Math.round((amount + fee) * 100) / 100;
+    // Generate short link slug
+    const slug = await generateUniqueSlug();
+
+    // Generate short code for public share links
+    const shortCode = await generateUniqueShortCode();
 
     // Create gift record
     const [newGift] = await db

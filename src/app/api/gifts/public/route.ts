@@ -175,9 +175,6 @@ export async function POST(request: NextRequest) {
     // Generate short code for public share links
     const shortCode = await generateUniqueShortCode();
 
-    // Convert unlockDatetime to UTC for database storage
-    const utcUnlockDatetime = unlockDatetime ? convertToUTCDate(unlockDatetime) : null;
-
     const [newGift] = await db
       .insert(gifts)
       .values({
