@@ -1,4 +1,4 @@
-import { integer, real, sqliteTable, text, index } from "drizzle-orm/sqlite-core";
+import { boolean, index, integer, pgTable, real, text } from "drizzle-orm/pg-core";
 
 export const supportedCurrencyCodes = ["NGN", "USD"] as const;
 
@@ -19,7 +19,7 @@ export const users = sqliteTable("User", {
   lastLogin: text("lastLogin"),
 });
 
-export const passwordResets = sqliteTable("PasswordReset", {
+export const passwordResets = pgTable("PasswordReset", {
   id: text("id").primaryKey(),
   userId: text("userId").notNull(),
   token: text("token").notNull(),
@@ -29,7 +29,7 @@ export const passwordResets = sqliteTable("PasswordReset", {
   ipAddress: text("ipAddress"),
 });
 
-export const refreshTokens = sqliteTable("RefreshToken", {
+export const refreshTokens = pgTable("RefreshToken", {
   id: text("id").primaryKey(),
   userId: text("userId").notNull(),
   token: text("token").notNull(),
@@ -39,7 +39,7 @@ export const refreshTokens = sqliteTable("RefreshToken", {
   deviceInfo: text("deviceInfo"),
 });
 
-export const gifts = sqliteTable("Gift", {
+export const gifts = pgTable("Gift", {
   id: text("id").primaryKey(),
   senderId: text("senderId"),
   recipientId: text("recipientId").notNull(),
@@ -53,20 +53,22 @@ export const gifts = sqliteTable("Gift", {
   otpAttempts: integer("otpAttempts").notNull().default(0),
   transactionId: text("transactionId"),
   blockchainTxHash: text("blockchain_tx_hash"),
-  hideAmount: integer("hideAmount", { mode: "boolean" }).notNull().default(false),
-  hideSender: integer("hideSender", { mode: "boolean" }).notNull().default(false),
-  isAnonymous: integer("isAnonymous", { mode: "boolean" }).notNull().default(false),
+  hideAmount: boolean("hideAmount").notNull().default(false),
+  hideSender: boolean("hideSender").notNull().default(false),
+  isAnonymous: boolean("isAnonymous").notNull().default(false),
   unlockDatetime: text("unlockDatetime"),
   senderName: text("senderName"),
   senderEmail: text("senderEmail"),
   senderAvatar: text("senderAvatar"),
+  slug: text("slug").unique(),
+  shortCode: text("shortCode").unique(),
   createdAt: text("createdAt").notNull(),
   updatedAt: text("updatedAt").notNull(),
 }, (table) => ({
   blockchainTxHashIdx: index("blockchain_tx_hash_idx").on(table.blockchainTxHash),
 }));
 
-export const wallets = sqliteTable("Wallet", {
+export const wallets = pgTable("Wallet", {
   id: text("id").primaryKey(),
   userId: text("userId").notNull(),
   currency: text("currency").notNull(),

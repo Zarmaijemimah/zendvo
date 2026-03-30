@@ -4,6 +4,7 @@ import {
   doublePrecision,
   index,
   integer,
+  jsonb,
   pgEnum,
   pgTable,
   text,
@@ -36,11 +37,11 @@ export const users = pgTable(
   "users",
   {
     id: uuid("id").defaultRandom().primaryKey(),
-    email: text("email").notNull().unique(),
+    email: text("email").notNull(),
     passwordHash: text("password_hash").notNull(),
     name: text("name"),
-    phoneNumber: text("phone_number").unique(),
-    username: text("username").unique(),
+    phoneNumber: text("phone_number"),
+    username: text("username"),
     avatarUrl: text("avatar_url"),
     role: text("role").default("user").notNull(),
     status: userStatusEnum("status").default("unverified").notNull(),
@@ -120,6 +121,7 @@ export const refreshTokens = pgTable(
     revokedAt: timestamp("revoked_at"),
     deviceInfo: text("device_info"),
     deviceId: text("device_id"),
+    fingerprint: text("fingerprint"),
   },
   (table) => {
     return [index("rt_user_id_idx").on(table.userId)];
@@ -135,6 +137,8 @@ export const gifts = pgTable(
       .notNull()
       .references(() => users.id),
     amount: doublePrecision("amount").notNull(),
+    fee: doublePrecision("fee").default(0).notNull(),
+    totalAmount: doublePrecision("total_amount").notNull(),
     currency: text("currency").notNull(),
     message: text("message"),
     template: text("template"),
@@ -149,6 +153,7 @@ export const gifts = pgTable(
     paymentVerifiedAt: timestamp("payment_verified_at"),
     hideAmount: boolean("hide_amount").default(false).notNull(),
     hideSender: boolean("hide_sender").default(false).notNull(),
+    isAnonymous: boolean("is_anonymous").default(false).notNull(),
     unlockDatetime: timestamp("unlock_datetime"),
     senderName: text("sender_name"),
     senderEmail: text("sender_email"),
@@ -156,6 +161,7 @@ export const gifts = pgTable(
     shareLink: text("share_link").unique(),
     shareLinkToken: text("share_link_token").unique(),
     slug: text("slug").unique(),
+    shortCode: text("short_code").unique(),
     coverImageId: text("cover_image_id"),
     linkExpiresAt: timestamp("link_expires_at"),
     completedAt: timestamp("completed_at"),
@@ -172,6 +178,8 @@ export const gifts = pgTable(
         table.recipientId,
       ),
       index("gift_share_link_token_idx").on(table.shareLinkToken),
+      index("gift_slug_idx").on(table.slug),
+      index("gift_short_code_idx").on(table.shortCode),
     ];
   },
 );
@@ -279,3 +287,19 @@ export const notificationsRelations = relations(notifications, ({ one }) => ({
     references: [users.id],
   }),
 }));
+
+export const webhookRetryQueue = pgTable("WebhookRetryQueue", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  eventType: text("event_type").notNull(),
+  payload: jsonb("payload").notNull(),
+  retryCount: integer("retry_count").default(0).notNull(),
+  maxRetries: integer("max_retries").default(5).notNull(),
+  nextAttemptAt: timestamp("next_attempt_at", { withTimezone: true }).notNull(),
+  lastError: text("last_error"),
+  createdAt: timestamp("created_at", { withTimezone: true })
+    .defaultNow()
+    .notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true })
+    .defaultNow()
+    .notNull(),
+});

@@ -6,11 +6,12 @@ import {
   sanitizeInput,
   validateMessage,
   validateUnlockAt,
-  CreateGiftSchema,
+  convertToUTCDate,
+  formatAsUTCISO,
 } from "@/lib/validation";
 import { generateOTP, storeGiftOTP } from "@/server/services/otpService";
 import { sendGiftConfirmationOTP } from "@/server/services/emailService";
-import { generateUniqueSlug } from "@/lib/slug";
+import { calculateFee } from "@/lib/fees";
 
 export async function GET() {
   return NextResponse.json({ gifts: [] });
@@ -93,6 +94,9 @@ export async function POST(request: NextRequest) {
     // Generate short link slug
     const slug = await generateUniqueSlug();
 
+    // Generate short code for public share links
+    const shortCode = await generateUniqueShortCode();
+
     // Create gift record
     const [newGift] = await db
       .insert(gifts)
@@ -104,9 +108,10 @@ export async function POST(request: NextRequest) {
         message: sanitizedMessage,
         template: sanitizedTemplate,
         coverImageId: sanitizedCoverImageId,
-        unlockDatetime: unlock_at ? new Date(unlock_at) : null,
+        unlockDatetime: utcUnlockDatetime,
         status: "pending_otp",
         slug,
+        shortCode,
       })
       .returning();
 
@@ -134,6 +139,7 @@ export async function POST(request: NextRequest) {
         giftId: newGift.id,
         status: "pending_otp",
         slug: newGift.slug,
+        shortCode: newGift.shortCode,
       },
       { status: 201 },
     );
